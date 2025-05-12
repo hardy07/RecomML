@@ -1,0 +1,30 @@
+# Node.js
+node_modules/
+
+# dotenv environment variable files
+.env
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Build directories
+/dist
+/build
+
+# Dependency directories
+/bower_components
+/.pnp
+.pnp.js
+
+# IDE files
+.vscode/
+.idea/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# React build files
+/client/build/
