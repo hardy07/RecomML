@@ -111,6 +111,13 @@ const requireAuth = async (req, res, next) => {
 };
 
 app.get("/login", (req, res) => {
+  // Log environment variables (safely)
+  console.log("Login route - Environment check:", {
+    hasClientId: !!process.env.CLIENT_ID,
+    hasClientSecret: !!process.env.CLIENT_SECRET,
+    redirectUri: process.env.REDIRECT_URI,
+  });
+
   const scope = [
     "user-read-recently-played",
     "playlist-modify-public",
@@ -128,6 +135,10 @@ app.get("/login", (req, res) => {
       redirect_uri: process.env.REDIRECT_URI,
       scope: scope,
     });
+
+  console.log(
+    "Redirecting to Spotify auth URL (client_id and redirect_uri present)"
+  );
   res.redirect(authURL);
 });
 
@@ -135,37 +146,65 @@ app.get("/callback", async (req, res) => {
   const code = req.query.code || null;
 
   try {
-    const tokenResponse = await axios.post(
-      "https://accounts.spotify.com/api/token",
-      querystring.stringify({
-        code,
-        redirect_uri: process.env.REDIRECT_URI,
-        grant_type: "authorization_code",
-      }),
-      {
-        headers: {
-          Authorization:
-            "Basic " +
-            Buffer.from(
-              `${process.env.CLIENT_ID}:${process.env.CLIENT_SECRET}`
-            ).toString("base64"),
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-      }
-    );
+    // Log the incoming request
+    console.log("Callback received with code:", code ? "Present" : "Missing");
+
+    const tokenResponse = await axios
+      .post(
+        "https://accounts.spotify.com/api/token",
+        querystring.stringify({
+          code,
+          redirect_uri: process.env.REDIRECT_URI,
+          grant_type: "authorization_code",
+        }),
+        {
+          headers: {
+            Authorization:
+              "Basic " +
+              Buffer.from(
+                `${process.env.CLIENT_ID}:${process.env.CLIENT_SECRET}`
+              ).toString("base64"),
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+        }
+      )
+      .catch((error) => {
+        console.error("Token exchange error:", {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message,
+        });
+        throw error;
+      });
+
+    console.log("Token exchange successful");
 
     // Get user profile from Spotify
-    const userProfile = await axios.get("https://api.spotify.com/v1/me", {
-      headers: { Authorization: `Bearer ${tokenResponse.data.access_token}` },
-    });
+    const userProfile = await axios
+      .get("https://api.spotify.com/v1/me", {
+        headers: { Authorization: `Bearer ${tokenResponse.data.access_token}` },
+      })
+      .catch((error) => {
+        console.error("Profile fetch error:", {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message,
+        });
+        throw error;
+      });
+
+    console.log("User profile fetched successfully");
 
     // Find or create user
     let user = await User.findOne({ spotifyId: userProfile.data.id });
     if (!user) {
+      console.log("Creating new user");
       user = new User({
         spotifyId: userProfile.data.id,
         email: userProfile.data.email,
       });
+    } else {
+      console.log("Found existing user");
     }
 
     // Update user tokens
@@ -175,15 +214,29 @@ app.get("/callback", async (req, res) => {
       Date.now() + tokenResponse.data.expires_in * 1000
     );
     user.lastLogin = new Date();
-    await user.save();
+
+    await user.save().catch((error) => {
+      console.error("User save error:", {
+        message: error.message,
+        code: error.code,
+        name: error.name,
+      });
+      throw error;
+    });
+
+    console.log("User saved successfully");
 
     // Set user session
     req.session.userId = user._id;
 
     res.redirect("/?status=success");
   } catch (err) {
-    console.error(err.response?.data || err);
-    res.redirect("/?status=error");
+    console.error("Callback error:", {
+      message: err.message,
+      response: err.response?.data,
+      stack: err.stack,
+    });
+    res.redirect("/?status=error&reason=" + encodeURIComponent(err.message));
   }
 });
 
