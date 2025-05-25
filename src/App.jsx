@@ -27,6 +27,20 @@ function App() {
       // Clean up the URL
       window.history.replaceState({}, document.title, "/");
     }
+
+    // Check authentication status on mount
+    const checkAuth = async () => {
+      try {
+        const response = await fetch("/check-auth");
+        const data = await response.json();
+        setIsLoggedIn(data.isAuthenticated);
+      } catch (error) {
+        console.error("Error checking auth status:", error);
+        setIsLoggedIn(false);
+      }
+    };
+
+    checkAuth();
   }, []);
 
   const handleLogin = () => {

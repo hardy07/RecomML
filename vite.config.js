@@ -9,6 +9,7 @@ export default defineConfig({
       "/callback": "http://localhost:3000",
       "/train-model": "http://localhost:3000",
       "/create-playlist": "http://localhost:3000",
+      "/check-auth": "http://localhost:3000",
     },
   },
   define: {

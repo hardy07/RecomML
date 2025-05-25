@@ -365,6 +365,35 @@ app.post("/create-playlist", requireAuth, async (req, res) => {
   }
 });
 
+// Add check-auth endpoint
+app.get("/check-auth", async (req, res) => {
+  try {
+    if (!req.session.userId) {
+      return res.json({ isAuthenticated: false });
+    }
+
+    const user = await User.findById(req.session.userId);
+    if (!user) {
+      return res.json({ isAuthenticated: false });
+    }
+
+    // Check if token needs refresh
+    if (user.tokenExpires <= new Date()) {
+      try {
+        await refreshAccessToken(user._id);
+      } catch (error) {
+        console.error("Error refreshing token:", error);
+        return res.json({ isAuthenticated: false });
+      }
+    }
+
+    res.json({ isAuthenticated: true });
+  } catch (error) {
+    console.error("Error checking auth:", error);
+    res.json({ isAuthenticated: false });
+  }
+});
+
 // Catch-all route to serve the frontend
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "dist", "index.html"));
