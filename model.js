@@ -99,11 +99,14 @@ class MusicRecommender {
       throw new Error("No valid seed tracks found");
     }
 
+    // Create a Set of all recently played track IDs for faster lookup
+    const recentTrackIds = new Set(seedTracks.map((track) => track.id));
+
     // Calculate similarity scores for all tracks
     const scores = new Map();
     this.tracks.forEach((candidateTrack, trackId) => {
-      // Don't recommend seed tracks
-      if (seedTracks.some((seed) => seed.id === trackId)) {
+      // Skip if the track is in recently played
+      if (recentTrackIds.has(trackId)) {
         return;
       }
 

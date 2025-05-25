@@ -1,0 +1,14 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    proxy: {
+      "/login": "http://localhost:3000",
+      "/callback": "http://localhost:3000",
+      "/train-model": "http://localhost:3000",
+      "/create-playlist": "http://localhost:3000",
+    },
+  },
+});

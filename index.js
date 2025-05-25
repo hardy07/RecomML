@@ -1,6 +1,7 @@
 const express = require("express");
 const axios = require("axios");
 const querystring = require("querystring");
+const path = require("path");
 const MusicRecommender = require("./model");
 require("dotenv").config();
 
@@ -11,6 +12,9 @@ let access_token = "";
 let refresh_token = "";
 const recommender = new MusicRecommender();
 let isModelTrained = false;
+
+// Serve static files from the dist directory
+app.use(express.static(path.join(__dirname, "dist")));
 
 // Add a function to refresh the access token
 async function refreshAccessToken() {
@@ -90,20 +94,18 @@ app.get("/callback", async (req, res) => {
     access_token = tokenResponse.data.access_token;
     refresh_token = tokenResponse.data.refresh_token;
 
-    res.send(`
-      <h2>Login Successful!</h2>
-      <p><a href="/train-model">First, click here to train the recommendation model</a></p>
-    `);
+    // Redirect back to the frontend with success status
+    res.redirect("/?status=success");
   } catch (err) {
     console.error(err.response?.data || err);
-    res.send("Error getting tokens");
+    res.redirect("/?status=error");
   }
 });
 
 app.get("/train-model", async (req, res) => {
   try {
     if (!access_token) {
-      return res.redirect("/login");
+      return res.status(401).json({ error: "Not authenticated" });
     }
 
     // Get user's saved tracks and recently played tracks for training
@@ -131,25 +133,25 @@ app.get("/train-model", async (req, res) => {
     await recommender.train(uniqueTracks);
     isModelTrained = true;
 
-    res.send(`
-      <h2>Model Training Complete!</h2>
-      <p>Trained on ${uniqueTracks.length} unique tracks.</p>
-      <p><a href="/create-playlist">Click here to generate a personalized playlist</a></p>
-    `);
+    res.json({
+      success: true,
+      message: "Model trained successfully",
+      tracksCount: uniqueTracks.length,
+    });
   } catch (err) {
     console.error("Error training model:", err.response?.data || err);
-    res.send("Error training model. Please try again.");
+    res.status(500).json({ error: "Error training model" });
   }
 });
 
 app.get("/create-playlist", async (req, res) => {
   try {
     if (!access_token) {
-      return res.redirect("/login");
+      return res.status(401).json({ error: "Not authenticated" });
     }
 
     if (!isModelTrained) {
-      return res.redirect("/train-model");
+      return res.status(400).json({ error: "Model not trained" });
     }
 
     // Get user profile
@@ -216,33 +218,21 @@ app.get("/create-playlist", async (req, res) => {
       }
     );
 
-    res.send(`
-      <h2>Playlist Created Successfully!</h2>
-      <h3>Seed Tracks:</h3>
-      <ul>
-        ${seedTracks
-          .map((track) => `<li>${track.name} by ${track.artists[0].name}</li>`)
-          .join("")}
-      </ul>
-      <h3>Recommended Tracks (with similarity scores):</h3>
-      <ul>
-        ${recommendedTracks
-          .map(
-            (track) =>
-              `<li>${track.name} by ${track.artists[0].name} (Similarity: ${(
-                track.similarity_score * 100
-              ).toFixed(1)}%)</li>`
-          )
-          .join("")}
-      </ul>
-      <p><a href="https://open.spotify.com/playlist/${
-        playlist.data.id
-      }" target="_blank">View Playlist on Spotify</a></p>
-    `);
+    res.json({
+      success: true,
+      playlist_url: `https://open.spotify.com/playlist/${playlist.data.id}`,
+      tracks: recommendedTracks,
+      seed_tracks: seedTracks,
+    });
   } catch (err) {
     console.error("Error creating playlist:", err.response?.data || err);
-    res.send("Error creating playlist. Please try again.");
+    res.status(500).json({ error: "Error creating playlist" });
   }
+});
+
+// Catch-all route to serve the frontend
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
 app.listen(PORT, () => {
