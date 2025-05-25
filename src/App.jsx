@@ -150,15 +150,17 @@ function App() {
   );
 
   return (
-    <div className="min-h-screen bg-spotify-black text-spotify-white flex flex-col">
-      <nav className="bg-spotify-gray p-4">
-        <div className="container mx-auto flex items-center">
+    <div className="min-h-screen bg-spotify-black text-white flex flex-col">
+      <nav className="bg-spotify-gray border-b border-zinc-800">
+        <div className="container mx-auto flex items-center h-16 px-4">
           <button
             onClick={handleHomeClick}
-            className="flex items-center hover:opacity-80 transition-opacity focus:outline-none"
+            className="flex items-center hover:opacity-80 transition-opacity focus:outline-none group"
           >
-            <MusicalNoteIcon className="h-8 w-8 text-spotify-green mr-2" />
-            <h1 className="text-2xl font-bold">RecomML</h1>
+            <MusicalNoteIcon className="h-8 w-8 text-spotify-green mr-2 group-hover:text-white transition-colors" />
+            <h1 className="text-2xl font-bold group-hover:text-spotify-green transition-colors">
+              RecomML
+            </h1>
           </button>
         </div>
       </nav>
@@ -167,10 +169,12 @@ function App() {
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">
             <h2 className="text-4xl font-bold mb-4">
-              Smart Music Recommendations
+              ML Meets Your Music Taste
             </h2>
-            <p className="text-lg text-gray-400">
-              Get personalized music recommendations powered by machine learning
+            <p className="text-lg text-gray-400 max-w-xl mx-auto">
+              A personalized music recommendation web app that analyzes your
+              Spotify listening habits using machine learning to suggest similar
+              tracks.
             </p>
           </div>
 
@@ -184,13 +188,14 @@ function App() {
 
           <div className="space-y-6">
             {!isLoggedIn ? (
-              <div className="bg-spotify-gray rounded-lg p-6">
+              <div className="bg-zinc-900 rounded-lg p-6">
                 <h3 className="text-xl font-bold mb-4">
                   Step 1: Connect with Spotify
                 </h3>
                 <p className="text-gray-400 mb-4">
-                  Connect your Spotify account to get started with personalized
-                  recommendations.
+                  Link your Spotify account to grant RecomML access to your
+                  listening history. We'll use this to understand your music
+                  preferences.
                 </p>
                 <button
                   onClick={handleLogin}
@@ -202,13 +207,14 @@ function App() {
                 </button>
               </div>
             ) : !isModelTrained ? (
-              <div className="bg-spotify-gray rounded-lg p-6">
+              <div className="bg-zinc-900 rounded-lg p-6">
                 <h3 className="text-xl font-bold mb-4">
-                  Step 2: Train Recommendation Model
+                  Step 2: Train Your Model
                 </h3>
                 <p className="text-gray-400 mb-4">
-                  Train the model using your music preferences to get accurate
-                  recommendations.
+                  Our machine learning model will analyze your music preferences
+                  using content-based filtering to understand what makes your
+                  favorite tracks special.
                 </p>
                 <button
                   onClick={handleTrainModel}
@@ -220,16 +226,18 @@ function App() {
                   ) : (
                     <ArrowPathIcon className="h-6 w-6 mr-2" />
                   )}
-                  {loading ? "Training Model..." : "Train Recommendation Model"}
+                  {loading ? "Analyzing Your Music..." : "Start Analysis"}
                 </button>
               </div>
             ) : showPlaylistForm ? (
-              <div className="bg-spotify-gray rounded-lg p-6">
+              <div className="bg-zinc-900 rounded-lg p-6">
                 <h3 className="text-xl font-bold mb-4">
                   Step 3: Customize Your Playlist
                 </h3>
                 <p className="text-gray-400 mb-4">
-                  Customize your playlist details before generation.
+                  We'll create a personalized playlist based on your music
+                  taste. Give it a name and description that reflects your
+                  style.
                 </p>
                 <form onSubmit={handleCreatePlaylist} className="space-y-4">
                   <div>
@@ -245,7 +253,7 @@ function App() {
                       name="name"
                       value={playlistDetails.name}
                       onChange={handlePlaylistDetailsChange}
-                      className="w-full px-4 py-2 rounded-md bg-black border border-gray-600 text-white focus:outline-none focus:border-spotify-green"
+                      className="w-full px-4 py-2 rounded-md bg-black border border-zinc-800 text-white focus:outline-none focus:border-spotify-green"
                       required
                     />
                   </div>
@@ -262,7 +270,7 @@ function App() {
                       value={playlistDetails.description}
                       onChange={handlePlaylistDetailsChange}
                       rows="3"
-                      className="w-full px-4 py-2 rounded-md bg-black border border-gray-600 text-white focus:outline-none focus:border-spotify-green"
+                      className="w-full px-4 py-2 rounded-md bg-black border border-zinc-800 text-white focus:outline-none focus:border-spotify-green"
                       required
                     />
                   </div>
@@ -277,12 +285,12 @@ function App() {
                       ) : (
                         <MusicalNoteIcon className="h-6 w-6 mr-2" />
                       )}
-                      {loading ? "Creating Playlist..." : "Create Playlist"}
+                      {loading ? "Creating Playlist..." : "Generate Playlist"}
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowPlaylistForm(false)}
-                      className="px-6 py-4 rounded-full border border-gray-600 hover:border-gray-400 text-gray-400 hover:text-white transition-colors"
+                      className="px-6 py-4 rounded-full border border-zinc-800 hover:border-zinc-600 text-gray-400 hover:text-white transition-colors"
                     >
                       Cancel
                     </button>
@@ -290,27 +298,30 @@ function App() {
                 </form>
               </div>
             ) : (
-              <div className="bg-spotify-gray rounded-lg p-6">
+              <div className="bg-zinc-900 rounded-lg p-6">
                 <h3 className="text-xl font-bold mb-4">
-                  Step 3: Generate Playlist
+                  Step 3: Generate Recommendations
                 </h3>
                 <p className="text-gray-400 mb-4">
-                  Create a personalized playlist based on your music taste.
+                  Ready to discover new music? Let's create a personalized
+                  playlist with tracks that match your unique taste.
                 </p>
                 <button
                   onClick={() => setShowPlaylistForm(true)}
                   className="w-full bg-spotify-green hover:bg-opacity-80 text-white font-bold py-4 px-6 rounded-full flex items-center justify-center"
                 >
                   <MusicalNoteIcon className="h-6 w-6 mr-2" />
-                  Generate Playlist
+                  Create Your Playlist
                 </button>
               </div>
             )}
           </div>
 
           {recommendations && (
-            <div className="mt-12 bg-spotify-gray rounded-lg p-6">
-              <h3 className="text-2xl font-bold mb-6">Your Recommendations</h3>
+            <div className="mt-12 bg-zinc-900 rounded-lg p-6">
+              <h3 className="text-2xl font-bold mb-6">
+                Your Personalized Recommendations
+              </h3>
               <div className="space-y-4">
                 {recommendations.tracks.map((track) => (
                   <div
@@ -339,8 +350,9 @@ function App() {
                   href={recommendations.playlist_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-spotify-green hover:underline"
+                  className="inline-flex items-center text-spotify-green hover:underline"
                 >
+                  <PlayIcon className="h-5 w-5 mr-2" />
                   Open Playlist in Spotify
                 </a>
               </div>
@@ -349,9 +361,9 @@ function App() {
         </div>
       </main>
 
-      <footer className="bg-spotify-gray py-6 mt-auto">
-        <div className="container mx-auto px-4 text-center text-gray-400">
-          <p>Powered by RecomML - Smart Music Recommendations</p>
+      <footer className="bg-spotify-gray border-t border-zinc-800">
+        <div className="container mx-auto h-16 px-4 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
+          <p>© 2025 RecomML. All rights reserved.</p>
         </div>
       </footer>
     </div>
