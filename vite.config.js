@@ -11,4 +11,9 @@ export default defineConfig({
       "/create-playlist": "http://localhost:3000",
     },
   },
+  define: {
+    "process.env.VITE_SPOTIFY_CLIENT_ID": JSON.stringify(
+      process.env.VITE_SPOTIFY_CLIENT_ID
+    ),
+  },
 });

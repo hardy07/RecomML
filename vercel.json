@@ -16,23 +16,23 @@
   "routes": [
     {
       "src": "/login",
-      "dest": "index.js"
+      "dest": "/index.js"
     },
     {
       "src": "/callback",
-      "dest": "index.js"
+      "dest": "/index.js"
     },
     {
       "src": "/train-model",
-      "dest": "index.js"
+      "dest": "/index.js"
     },
     {
       "src": "/create-playlist",
-      "dest": "index.js"
+      "dest": "/index.js"
     },
     {
-      "src": "/api/(.*)",
-      "dest": "index.js"
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
     },
     {
       "src": "/(.*)",
