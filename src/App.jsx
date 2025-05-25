@@ -243,75 +243,7 @@ function App() {
                   {loading ? "Analyzing Your Music..." : "Start Analysis"}
                 </button>
               </div>
-            ) : showPlaylistForm ? (
-              <div className="bg-zinc-900 rounded-lg p-6">
-                <h3 className="text-xl font-bold mb-4">
-                  Step 3: Customize Your Playlist
-                </h3>
-                <p className="text-gray-400 mb-4">
-                  We'll create a personalized playlist based on your music
-                  taste. Give it a name and description that reflects your
-                  style.
-                </p>
-                <form onSubmit={handleCreatePlaylist} className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="name"
-                      className="block text-sm font-medium mb-2"
-                    >
-                      Playlist Name
-                    </label>
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      value={playlistDetails.name}
-                      onChange={handlePlaylistDetailsChange}
-                      className="w-full px-4 py-2 rounded-md bg-black border border-zinc-800 text-white focus:outline-none focus:border-spotify-green"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="description"
-                      className="block text-sm font-medium mb-2"
-                    >
-                      Description
-                    </label>
-                    <textarea
-                      id="description"
-                      name="description"
-                      value={playlistDetails.description}
-                      onChange={handlePlaylistDetailsChange}
-                      rows="3"
-                      className="w-full px-4 py-2 rounded-md bg-black border border-zinc-800 text-white focus:outline-none focus:border-spotify-green"
-                      required
-                    />
-                  </div>
-                  <div className="flex space-x-4">
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="flex-1 bg-spotify-green hover:bg-opacity-80 text-white font-bold py-4 px-6 rounded-full flex items-center justify-center disabled:opacity-50"
-                    >
-                      {loading ? (
-                        <ArrowPathIcon className="h-6 w-6 mr-2 animate-spin" />
-                      ) : (
-                        <MusicalNoteIcon className="h-6 w-6 mr-2" />
-                      )}
-                      {loading ? "Creating Playlist..." : "Generate Playlist"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowPlaylistForm(false)}
-                      className="px-6 py-4 rounded-full border border-zinc-800 hover:border-zinc-600 text-gray-400 hover:text-white transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ) : (
+            ) : !recommendations && !showPlaylistForm ? (
               <div className="bg-zinc-900 rounded-lg p-6">
                 <h3 className="text-xl font-bold mb-4">
                   Step 3: Generate Recommendations
@@ -328,6 +260,76 @@ function App() {
                   Create Your Playlist
                 </button>
               </div>
+            ) : (
+              showPlaylistForm && (
+                <div className="bg-zinc-900 rounded-lg p-6">
+                  <h3 className="text-xl font-bold mb-4">
+                    Step 3: Customize Your Playlist
+                  </h3>
+                  <p className="text-gray-400 mb-4">
+                    We'll create a personalized playlist based on your music
+                    taste. Give it a name and description that reflects your
+                    style.
+                  </p>
+                  <form onSubmit={handleCreatePlaylist} className="space-y-4">
+                    <div>
+                      <label
+                        htmlFor="name"
+                        className="block text-sm font-medium mb-2"
+                      >
+                        Playlist Name
+                      </label>
+                      <input
+                        type="text"
+                        id="name"
+                        name="name"
+                        value={playlistDetails.name}
+                        onChange={handlePlaylistDetailsChange}
+                        className="w-full px-4 py-2 rounded-md bg-black border border-zinc-800 text-white focus:outline-none focus:border-spotify-green"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="description"
+                        className="block text-sm font-medium mb-2"
+                      >
+                        Description
+                      </label>
+                      <textarea
+                        id="description"
+                        name="description"
+                        value={playlistDetails.description}
+                        onChange={handlePlaylistDetailsChange}
+                        rows="3"
+                        className="w-full px-4 py-2 rounded-md bg-black border border-zinc-800 text-white focus:outline-none focus:border-spotify-green"
+                        required
+                      />
+                    </div>
+                    <div className="flex space-x-4">
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="flex-1 bg-spotify-green hover:bg-opacity-80 text-white font-bold py-4 px-6 rounded-full flex items-center justify-center disabled:opacity-50"
+                      >
+                        {loading ? (
+                          <ArrowPathIcon className="h-6 w-6 mr-2 animate-spin" />
+                        ) : (
+                          <MusicalNoteIcon className="h-6 w-6 mr-2" />
+                        )}
+                        {loading ? "Creating Playlist..." : "Generate Playlist"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowPlaylistForm(false)}
+                        className="px-6 py-4 rounded-full border border-zinc-800 hover:border-zinc-600 text-gray-400 hover:text-white transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )
             )}
           </div>
 
