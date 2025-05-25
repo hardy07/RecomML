@@ -9,8 +9,7 @@
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "dist",
-        "zeroConfig": true
+        "distDir": "dist"
       }
     }
   ],
@@ -24,10 +23,6 @@
       "dest": "/index.js"
     },
     {
-      "src": "/check-auth",
-      "dest": "/index.js"
-    },
-    {
       "src": "/train-model",
       "dest": "/index.js"
     },
@@ -37,15 +32,11 @@
     },
     {
       "src": "/assets/(.*)",
-      "headers": { "cache-control": "public, max-age=31536000, immutable" },
-      "dest": "/dist/assets/$1"
-    },
-    {
-      "handle": "filesystem"
+      "dest": "/assets/$1"
     },
     {
       "src": "/(.*)",
-      "dest": "/dist/index.html"
+      "dest": "/index.html"
     }
   ]
 }

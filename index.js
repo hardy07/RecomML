@@ -12,32 +12,13 @@ require("dotenv").config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Update MongoDB connection for serverless
-let cachedDb = null;
-async function connectToDatabase() {
-  if (cachedDb) {
-    return cachedDb;
-  }
-  await connectDB();
-  cachedDb = true;
-  return cachedDb;
-}
-
-// Ensure database connection before handling requests
-app.use(async (req, res, next) => {
-  try {
-    await connectToDatabase();
-    next();
-  } catch (error) {
-    console.error("Database connection error:", error);
-    res.status(500).json({ error: "Database connection failed" });
-  }
-});
+// Connect to MongoDB
+connectDB();
 
 // Middleware to parse JSON bodies
 app.use(express.json());
 
-// Update session configuration for production
+// Session middleware
 app.use(
   session({
     secret: process.env.SESSION_SECRET,
@@ -45,28 +26,15 @@ app.use(
     saveUninitialized: false,
     store: MongoStore.create({
       mongoUrl: process.env.MONGODB_URI,
-      ttl: 24 * 60 * 60,
-      autoRemove: "native",
-      touchAfter: 24 * 3600, // Only update the session every 24 hours unless the data changes
+      ttl: 24 * 60 * 60, // Session TTL of 1 day
     }),
     cookie: {
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000,
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
     },
   })
 );
-
-// Debug middleware to log session info
-app.use((req, res, next) => {
-  console.log("Session debug:", {
-    hasSession: !!req.session,
-    userId: req.session?.userId,
-    url: req.url,
-  });
-  next();
-});
 
 // Serve static files from the dist directory
 app.use(express.static(path.join(__dirname, "dist")));
@@ -142,16 +110,14 @@ const requireAuth = async (req, res, next) => {
   }
 };
 
-// Update redirect URI based on environment
-const getRedirectUri = () => {
-  if (process.env.NODE_ENV === "production") {
-    return `${process.env.VERCEL_URL}/callback`;
-  }
-  return process.env.REDIRECT_URI;
-};
-
-// Update login route
 app.get("/login", (req, res) => {
+  // Log environment variables (safely)
+  console.log("Login route - Environment check:", {
+    hasClientId: !!process.env.CLIENT_ID,
+    hasClientSecret: !!process.env.CLIENT_SECRET,
+    redirectUri: process.env.REDIRECT_URI,
+  });
+
   const scope = [
     "user-read-recently-played",
     "playlist-modify-public",
@@ -166,36 +132,52 @@ app.get("/login", (req, res) => {
     querystring.stringify({
       client_id: process.env.CLIENT_ID,
       response_type: "code",
-      redirect_uri: getRedirectUri(),
+      redirect_uri: process.env.REDIRECT_URI,
       scope: scope,
     });
 
+  console.log(
+    "Redirecting to Spotify auth URL (client_id and redirect_uri present)"
+  );
   res.redirect(authURL);
 });
 
-// Update callback route
 app.get("/callback", async (req, res) => {
   const code = req.query.code || null;
 
   try {
-    const tokenResponse = await axios.post(
-      "https://accounts.spotify.com/api/token",
-      querystring.stringify({
-        code,
-        redirect_uri: getRedirectUri(),
-        grant_type: "authorization_code",
-      }),
-      {
-        headers: {
-          Authorization:
-            "Basic " +
-            Buffer.from(
-              `${process.env.CLIENT_ID}:${process.env.CLIENT_SECRET}`
-            ).toString("base64"),
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-      }
-    );
+    // Log the incoming request
+    console.log("Callback received with code:", code ? "Present" : "Missing");
+
+    const tokenResponse = await axios
+      .post(
+        "https://accounts.spotify.com/api/token",
+        querystring.stringify({
+          code,
+          redirect_uri: process.env.REDIRECT_URI,
+          grant_type: "authorization_code",
+        }),
+        {
+          headers: {
+            Authorization:
+              "Basic " +
+              Buffer.from(
+                `${process.env.CLIENT_ID}:${process.env.CLIENT_SECRET}`
+              ).toString("base64"),
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+        }
+      )
+      .catch((error) => {
+        console.error("Token exchange error:", {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message,
+        });
+        throw error;
+      });
+
+    console.log("Token exchange successful");
 
     // Get user profile from Spotify
     const userProfile = await axios
@@ -249,7 +231,11 @@ app.get("/callback", async (req, res) => {
 
     res.redirect("/?status=success");
   } catch (err) {
-    console.error("Callback error:", err);
+    console.error("Callback error:", {
+      message: err.message,
+      response: err.response?.data,
+      stack: err.stack,
+    });
     res.redirect("/?status=error&reason=" + encodeURIComponent(err.message));
   }
 });
@@ -379,61 +365,11 @@ app.post("/create-playlist", requireAuth, async (req, res) => {
   }
 });
 
-// Add check-auth endpoint
-app.get("/check-auth", async (req, res) => {
-  try {
-    console.log("Check-auth request received, session:", {
-      hasSession: !!req.session,
-      userId: req.session?.userId,
-    });
-
-    if (!req.session.userId) {
-      console.log("No userId in session");
-      return res.json({ isAuthenticated: false });
-    }
-
-    const user = await User.findById(req.session.userId);
-    if (!user) {
-      console.log("User not found in database");
-      return res.json({ isAuthenticated: false });
-    }
-
-    console.log("User found:", {
-      spotifyId: user.spotifyId,
-      tokenExpires: user.tokenExpires,
-    });
-
-    // Check if token needs refresh
-    if (user.tokenExpires <= new Date()) {
-      try {
-        console.log("Token expired, attempting refresh");
-        await refreshAccessToken(user._id);
-        console.log("Token refresh successful");
-      } catch (error) {
-        console.error("Error refreshing token:", error);
-        return res.json({ isAuthenticated: false });
-      }
-    }
-
-    console.log("Authentication check successful");
-    res.json({ isAuthenticated: true });
-  } catch (error) {
-    console.error("Error checking auth:", error);
-    res.json({ isAuthenticated: false });
-  }
-});
-
 // Catch-all route to serve the frontend
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
-// Only start the server in development
-if (process.env.NODE_ENV !== "production") {
-  app.listen(PORT, () => {
-    console.log(`Server running at http://127.0.0.1:${PORT}`);
-  });
-}
-
-// Export the Express app for Vercel
-module.exports = app;
+app.listen(PORT, () => {
+  console.log(`Server running at http://127.0.0.1:${PORT}`);
+});
