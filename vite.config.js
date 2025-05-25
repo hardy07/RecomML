@@ -12,6 +12,12 @@ export default defineConfig({
       "/check-auth": "http://localhost:3000",
     },
   },
+  build: {
+    outDir: "dist",
+    assetsDir: "assets",
+    emptyOutDir: true,
+    sourcemap: true,
+  },
   define: {
     "process.env.VITE_SPOTIFY_CLIENT_ID": JSON.stringify(
       process.env.VITE_SPOTIFY_CLIENT_ID
