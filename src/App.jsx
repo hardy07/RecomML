@@ -11,6 +11,11 @@ function App() {
   const [recommendations, setRecommendations] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [playlistDetails, setPlaylistDetails] = useState({
+    name: "RecomML - Smart Recommendations",
+    description: "Personalized recommendations using content-based filtering",
+  });
+  const [showPlaylistForm, setShowPlaylistForm] = useState(false);
 
   useEffect(() => {
     // Check URL parameters for login status
@@ -46,15 +51,23 @@ function App() {
     }
   };
 
-  const handleCreatePlaylist = async () => {
+  const handleCreatePlaylist = async (e) => {
+    e.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/create-playlist");
+      const response = await fetch("/create-playlist", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(playlistDetails),
+      });
       const data = await response.json();
 
       if (response.ok) {
         setRecommendations(data);
+        setShowPlaylistForm(false);
         // Open the playlist in a new tab
         if (data.playlist_url) {
           window.open(data.playlist_url, "_blank");
@@ -68,6 +81,14 @@ function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePlaylistDetailsChange = (e) => {
+    const { name, value } = e.target;
+    setPlaylistDetails((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   return (
@@ -119,18 +140,71 @@ function App() {
                 )}
                 {loading ? "Training Model..." : "Train Recommendation Model"}
               </button>
+            ) : showPlaylistForm ? (
+              <form onSubmit={handleCreatePlaylist} className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="name"
+                    className="block text-sm font-medium mb-2"
+                  >
+                    Playlist Name
+                  </label>
+                  <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    value={playlistDetails.name}
+                    onChange={handlePlaylistDetailsChange}
+                    className="w-full px-4 py-2 rounded-md bg-spotify-gray border border-gray-600 text-white focus:outline-none focus:border-spotify-green"
+                    required
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="description"
+                    className="block text-sm font-medium mb-2"
+                  >
+                    Description
+                  </label>
+                  <textarea
+                    id="description"
+                    name="description"
+                    value={playlistDetails.description}
+                    onChange={handlePlaylistDetailsChange}
+                    rows="3"
+                    className="w-full px-4 py-2 rounded-md bg-spotify-gray border border-gray-600 text-white focus:outline-none focus:border-spotify-green"
+                    required
+                  />
+                </div>
+                <div className="flex space-x-4">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 bg-spotify-green hover:bg-opacity-80 text-white font-bold py-4 px-6 rounded-full flex items-center justify-center disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <ArrowPathIcon className="h-6 w-6 mr-2 animate-spin" />
+                    ) : (
+                      <MusicalNoteIcon className="h-6 w-6 mr-2" />
+                    )}
+                    {loading ? "Creating Playlist..." : "Create Playlist"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPlaylistForm(false)}
+                    className="px-6 py-4 rounded-full border border-gray-600 hover:border-gray-400 text-gray-400 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
             ) : (
               <button
-                onClick={handleCreatePlaylist}
-                disabled={loading}
-                className="w-full bg-spotify-green hover:bg-opacity-80 text-white font-bold py-4 px-6 rounded-full flex items-center justify-center disabled:opacity-50"
+                onClick={() => setShowPlaylistForm(true)}
+                className="w-full bg-spotify-green hover:bg-opacity-80 text-white font-bold py-4 px-6 rounded-full flex items-center justify-center"
               >
-                {loading ? (
-                  <ArrowPathIcon className="h-6 w-6 mr-2 animate-spin" />
-                ) : (
-                  <MusicalNoteIcon className="h-6 w-6 mr-2" />
-                )}
-                {loading ? "Creating Playlist..." : "Generate Playlist"}
+                <MusicalNoteIcon className="h-6 w-6 mr-2" />
+                Generate Playlist
               </button>
             )}
           </div>

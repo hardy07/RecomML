@@ -2,28 +2,59 @@ const express = require("express");
 const axios = require("axios");
 const querystring = require("querystring");
 const path = require("path");
+const session = require("express-session");
+const MongoStore = require("connect-mongo");
+const connectDB = require("./config/database");
+const User = require("./models/User");
 const MusicRecommender = require("./model");
 require("dotenv").config();
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
-let access_token = "";
-let refresh_token = "";
-const recommender = new MusicRecommender();
-let isModelTrained = false;
+// Connect to MongoDB
+connectDB();
+
+// Middleware to parse JSON bodies
+app.use(express.json());
+
+// Session middleware
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGODB_URI,
+      ttl: 24 * 60 * 60, // Session TTL of 1 day
+    }),
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
+    },
+  })
+);
 
 // Serve static files from the dist directory
 app.use(express.static(path.join(__dirname, "dist")));
 
+const recommender = new MusicRecommender();
+let isModelTrained = false;
+
 // Add a function to refresh the access token
-async function refreshAccessToken() {
+async function refreshAccessToken(userId) {
   try {
+    const user = await User.findById(userId);
+    if (!user) throw new Error("User not found");
+
+    const { refreshToken } = user.getDecryptedTokens();
+
     const response = await axios.post(
       "https://accounts.spotify.com/api/token",
       querystring.stringify({
         grant_type: "refresh_token",
-        refresh_token: refresh_token,
+        refresh_token: refreshToken,
       }),
       {
         headers: {
@@ -36,16 +67,48 @@ async function refreshAccessToken() {
         },
       }
     );
-    access_token = response.data.access_token;
+
+    // Update user tokens
+    user.accessToken = response.data.access_token;
     if (response.data.refresh_token) {
-      refresh_token = response.data.refresh_token;
+      user.refreshToken = response.data.refresh_token;
     }
-    return true;
+    user.tokenExpires = new Date(Date.now() + response.data.expires_in * 1000);
+    await user.save();
+
+    return user.getDecryptedTokens().accessToken;
   } catch (error) {
     console.error("Error refreshing token:", error.response?.data || error);
-    return false;
+    throw error;
   }
 }
+
+// Middleware to check authentication
+const requireAuth = async (req, res, next) => {
+  try {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const user = await User.findById(req.session.userId);
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
+    }
+
+    // Check if token needs refresh
+    if (user.tokenExpires <= new Date()) {
+      const newAccessToken = await refreshAccessToken(user._id);
+      req.accessToken = newAccessToken;
+    } else {
+      req.accessToken = user.getDecryptedTokens().accessToken;
+    }
+
+    next();
+  } catch (error) {
+    console.error("Auth error:", error);
+    res.status(401).json({ error: "Authentication failed" });
+  }
+};
 
 app.get("/login", (req, res) => {
   const scope = [
@@ -91,10 +154,32 @@ app.get("/callback", async (req, res) => {
       }
     );
 
-    access_token = tokenResponse.data.access_token;
-    refresh_token = tokenResponse.data.refresh_token;
+    // Get user profile from Spotify
+    const userProfile = await axios.get("https://api.spotify.com/v1/me", {
+      headers: { Authorization: `Bearer ${tokenResponse.data.access_token}` },
+    });
 
-    // Redirect back to the frontend with success status
+    // Find or create user
+    let user = await User.findOne({ spotifyId: userProfile.data.id });
+    if (!user) {
+      user = new User({
+        spotifyId: userProfile.data.id,
+        email: userProfile.data.email,
+      });
+    }
+
+    // Update user tokens
+    user.accessToken = tokenResponse.data.access_token;
+    user.refreshToken = tokenResponse.data.refresh_token;
+    user.tokenExpires = new Date(
+      Date.now() + tokenResponse.data.expires_in * 1000
+    );
+    user.lastLogin = new Date();
+    await user.save();
+
+    // Set user session
+    req.session.userId = user._id;
+
     res.redirect("/?status=success");
   } catch (err) {
     console.error(err.response?.data || err);
@@ -102,21 +187,17 @@ app.get("/callback", async (req, res) => {
   }
 });
 
-app.get("/train-model", async (req, res) => {
+app.get("/train-model", requireAuth, async (req, res) => {
   try {
-    if (!access_token) {
-      return res.status(401).json({ error: "Not authenticated" });
-    }
-
     // Get user's saved tracks and recently played tracks for training
     const [savedTracks, recentTracks] = await Promise.all([
       axios.get("https://api.spotify.com/v1/me/tracks?limit=50", {
-        headers: { Authorization: `Bearer ${access_token}` },
+        headers: { Authorization: `Bearer ${req.accessToken}` },
       }),
       axios.get(
         "https://api.spotify.com/v1/me/player/recently-played?limit=50",
         {
-          headers: { Authorization: `Bearer ${access_token}` },
+          headers: { Authorization: `Bearer ${req.accessToken}` },
         }
       ),
     ]);
@@ -144,19 +225,21 @@ app.get("/train-model", async (req, res) => {
   }
 });
 
-app.get("/create-playlist", async (req, res) => {
+app.post("/create-playlist", requireAuth, async (req, res) => {
   try {
-    if (!access_token) {
-      return res.status(401).json({ error: "Not authenticated" });
-    }
-
     if (!isModelTrained) {
       return res.status(400).json({ error: "Model not trained" });
     }
 
+    // Get playlist details from request body
+    const playlistName = req.body.name || "RecomML - Smart Recommendations";
+    const playlistDescription =
+      req.body.description ||
+      "Personalized recommendations using content-based filtering";
+
     // Get user profile
     const userProfile = await axios.get("https://api.spotify.com/v1/me", {
-      headers: { Authorization: `Bearer ${access_token}` },
+      headers: { Authorization: `Bearer ${req.accessToken}` },
     });
     const user_id = userProfile.data.id;
 
@@ -164,7 +247,7 @@ app.get("/create-playlist", async (req, res) => {
     const recentTracks = await axios.get(
       "https://api.spotify.com/v1/me/player/recently-played?limit=10",
       {
-        headers: { Authorization: `Bearer ${access_token}` },
+        headers: { Authorization: `Bearer ${req.accessToken}` },
       }
     );
 
@@ -183,7 +266,7 @@ app.get("/create-playlist", async (req, res) => {
         const response = await axios.get(
           `https://api.spotify.com/v1/tracks/${rec.trackId}`,
           {
-            headers: { Authorization: `Bearer ${access_token}` },
+            headers: { Authorization: `Bearer ${req.accessToken}` },
           }
         );
         return {
@@ -193,17 +276,16 @@ app.get("/create-playlist", async (req, res) => {
       })
     );
 
-    // Create a new playlist
+    // Create a new playlist with custom name and description
     const playlist = await axios.post(
       `https://api.spotify.com/v1/users/${user_id}/playlists`,
       {
-        name: "RecomML - Smart Recommendations",
-        description:
-          "Personalized recommendations using content-based filtering",
+        name: playlistName,
+        description: playlistDescription,
         public: true,
       },
       {
-        headers: { Authorization: `Bearer ${access_token}` },
+        headers: { Authorization: `Bearer ${req.accessToken}` },
       }
     );
 
@@ -214,7 +296,7 @@ app.get("/create-playlist", async (req, res) => {
         uris: recommendedTracks.map((track) => track.uri),
       },
       {
-        headers: { Authorization: `Bearer ${access_token}` },
+        headers: { Authorization: `Bearer ${req.accessToken}` },
       }
     );
 
