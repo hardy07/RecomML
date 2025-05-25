@@ -23,6 +23,7 @@ function App() {
     // Check URL parameters for login status
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get("status") === "success") {
+      console.log("Login success detected from URL params");
       setIsLoggedIn(true);
       // Clean up the URL
       window.history.replaceState({}, document.title, "/");
@@ -31,8 +32,10 @@ function App() {
     // Check authentication status on mount
     const checkAuth = async () => {
       try {
+        console.log("Checking authentication status...");
         const response = await fetch("/check-auth");
         const data = await response.json();
+        console.log("Auth check response:", data);
         setIsLoggedIn(data.isAuthenticated);
       } catch (error) {
         console.error("Error checking auth status:", error);
@@ -42,6 +45,17 @@ function App() {
 
     checkAuth();
   }, []);
+
+  // Debug log for state changes
+  useEffect(() => {
+    console.log("State updated:", {
+      isLoggedIn,
+      isModelTrained,
+      hasRecommendations: !!recommendations,
+      showPlaylistForm,
+      error,
+    });
+  }, [isLoggedIn, isModelTrained, recommendations, showPlaylistForm, error]);
 
   const handleLogin = () => {
     window.location.href = "/login";
